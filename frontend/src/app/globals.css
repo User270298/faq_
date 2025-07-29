@@ -1,0 +1,98 @@
+@import "tailwindcss";
+
+:root {
+  --background: #ffffff;
+  --foreground: #171717;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+/* Отключаем автоматическое переключение на темную тему */
+/* @media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0a0a0a;
+    --foreground: #ededed;
+  }
+} */
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+/* Принудительно белый фон для полей ввода в форме заявки */
+input[type="text"],
+input[type="email"],
+input[type="tel"],
+input[type="password"],
+textarea,
+select {
+  background-color: white !important;
+  color: black !important;
+  -webkit-appearance: none !important;
+  -moz-appearance: none !important;
+  appearance: none !important;
+  border-color: #d1d5db !important;
+}
+
+/* Дополнительные селекторы для максимальной совместимости */
+input,
+textarea,
+select {
+  background-color: white !important;
+  color: black !important;
+}
+
+/* Специально для формы заявки */
+form input,
+form textarea,
+form select {
+  background-color: white !important;
+  color: black !important;
+  border-color: #d1d5db !important;
+}
+
+/* Дополнительные стили для темной темы браузера */
+@media (prefers-color-scheme: dark) {
+  input[type="text"],
+  input[type="email"],
+  input[type="tel"],
+  input[type="password"],
+  textarea,
+  select {
+    background-color: white !important;
+    color: black !important;
+    border-color: #d1d5db !important;
+  }
+  
+  input[type="text"]::placeholder,
+  input[type="email"]::placeholder,
+  input[type="tel"]::placeholder,
+  textarea::placeholder {
+    color: #6b7280 !important;
+  }
+  
+  /* Принудительное переопределение для всех полей ввода */
+  input,
+  textarea,
+  select {
+    background-color: white !important;
+    color: black !important;
+    border-color: #d1d5db !important;
+  }
+  
+  /* Специально для формы заявки в темной теме */
+  form input,
+  form textarea,
+  form select {
+    background-color: white !important;
+    color: black !important;
+    border-color: #d1d5db !important;
+  }
+}
