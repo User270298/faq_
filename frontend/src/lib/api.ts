@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://192.168.0.94:8000'; // Замените на ваш IP
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || ''; // Используем относительные пути для API routes
 
 const api = axios.create({
   baseURL: API_BASE_URL,

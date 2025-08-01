@@ -1,19 +1,14 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  output: 'export', // Включаем статический экспорт
-  trailingSlash: true, // Добавляем trailing slash для статических файлов
+  // output: 'export', // Убираем для поддержки API routes
+  trailingSlash: true,
   images: {
-    unoptimized: true, // Отключаем оптимизацию изображений для статического экспорта
+    unoptimized: true,
   },
-  async rewrites() {
-    return [
-      {
-        source: '/api/:path*',
-        destination: 'http://localhost:8000/api/:path*',
-      },
-    ];
-  },
+  // Убираем rewrites для статического экспорта
+  assetPrefix: '',
+
 };
 
 export default nextConfig;

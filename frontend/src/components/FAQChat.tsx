@@ -33,7 +33,7 @@ export default function FAQChat({ onActivity }: FAQChatProps) {
     try {
       localStorage.setItem('faq-chat-messages', JSON.stringify(messages));
       localStorage.setItem('faq-chat-question-count', questionCount.toString());
-    } catch (error: unknown) {
+    } catch (error) {
       console.error('Ошибка сохранения в localStorage:', error);
     }
   };
@@ -58,7 +58,7 @@ export default function FAQChat({ onActivity }: FAQChatProps) {
           };
         });
       }
-    } catch (error: unknown) {
+    } catch (error) {
       console.error('Ошибка загрузки из localStorage:', error);
     }
     return [];
@@ -157,7 +157,7 @@ export default function FAQChat({ onActivity }: FAQChatProps) {
         setShowPopularQuestions(true);
       }, 12000);
     } catch (error: unknown) {
-      console.error('Ошибка при поиске FAQ:', error);
+      console.error('Ошибка при поиске ответа:', error);
       const errorMessage: Message = {
         id: (Date.now() + 1).toString(),
         type: 'bot',
@@ -306,7 +306,7 @@ export default function FAQChat({ onActivity }: FAQChatProps) {
         setShowPopularQuestions(true);
       }, 12000);
     } catch (error: unknown) {
-      console.error('Ошибка при поиске FAQ (quick question):', error);
+      console.error('Ошибка при поиске ответа:', error);
       const errorMessage: Message = {
         id: (Date.now() + 1).toString(),
         type: 'bot',

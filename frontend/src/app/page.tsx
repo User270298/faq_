@@ -236,7 +236,7 @@ export default function Home() {
     try {
       console.log('📤 Отправляем заявку:', applicationForm);
       // Отправляем данные на бэкенд
-      const response = await fetch('http://192.168.0.94:8000/api/applications/submit', { // Ваш IP
+                      const response = await fetch('/api/applications/submit', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

@@ -14,7 +14,7 @@ export default function FAQWidget({
   // autoOpenDelay = 5000, // Убираем неиспользуемые параметры
   // autoHideDelay = 30000
 }: FAQWidgetProps) {
-  const [isOpen, setIsOpen] = useState(true); // Всегда открыт
+  const [isOpen] = useState(true); // Всегда открыт
   const [showApplication, setShowApplication] = useState(false);
   // const [lastActivity, setLastActivity] = useState(Date.now()); // Убираем неиспользуемую переменную
 
