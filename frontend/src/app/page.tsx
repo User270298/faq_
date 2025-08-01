@@ -21,7 +21,7 @@ export default function Home() {
   const [showApplicationSuggestion, setShowApplicationSuggestion] = useState(false);
   const [hasShownApplicationSuggestion, setHasShownApplicationSuggestion] = useState(false); // Флаг для показа только один раз
   const [isFullChatOpen, setIsFullChatOpen] = useState(false);
-  const [questionCount, setQuestionCount] = useState(0);
+  // const [questionCount, setQuestionCount] = useState(0); // Убираем неиспользуемую переменную
   const [showApplicationModal, setShowApplicationModal] = useState(false);
   const [applicationForm, setApplicationForm] = useState({ 
     name: '', 
@@ -126,7 +126,7 @@ export default function Home() {
     setMessages(prev => [...prev, userMessage]);
     setInputValue('');
     setIsLoading(true);
-    setQuestionCount(prev => prev + 1);
+    // setQuestionCount(prev => prev + 1); // Убираем неиспользуемую переменную
     setShowPopularQuestions(false);
 
     try {
@@ -149,7 +149,8 @@ export default function Home() {
         };
         setMessages(prev => [...prev, botMessage]);
       }
-    } catch (error) {
+    } catch (error: unknown) {
+      console.error('Ошибка при поиске FAQ:', error);
       const botMessage: Message = {
         id: (Date.now() + 1).toString(),
         type: 'bot',
@@ -172,7 +173,7 @@ export default function Home() {
   const handleQuickQuestion = async (question: string) => {
     // НЕ вставляем вопрос в поле ввода
     setShowPopularQuestions(false);
-    setQuestionCount(prev => prev + 1);
+    // setQuestionCount(prev => prev + 1); // Убираем неиспользуемую переменную
     
     const userMessage: Message = {
       id: Date.now().toString(),
@@ -204,7 +205,8 @@ export default function Home() {
         };
         setMessages(prev => [...prev, botMessage]);
       }
-    } catch (error) {
+    } catch (error: unknown) {
+      console.error('Ошибка при поиске FAQ (quick question):', error);
       const botMessage: Message = {
         id: (Date.now() + 1).toString(),
         type: 'bot',
@@ -234,7 +236,7 @@ export default function Home() {
     try {
       console.log('📤 Отправляем заявку:', applicationForm);
       // Отправляем данные на бэкенд
-      const response = await fetch('http://localhost:8000/api/applications/submit', {
+      const response = await fetch('http://192.168.0.94:8000/api/applications/submit', { // Ваш IP
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -267,7 +269,7 @@ export default function Home() {
         const errorText = await response.text();
         console.error('❌ Текст ошибки:', errorText);
       }
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('❌ Ошибка отправки заявки:', error);
     } finally {
       setIsSubmitting(false);

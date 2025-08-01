@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { Send, Bot, User, Sparkles } from 'lucide-react';
+import { Send, Bot, Sparkles } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { searchFAQ } from '@/lib/api';
 import ApplicationForm from './ApplicationForm';
@@ -33,7 +33,7 @@ export default function FAQChat({ onActivity }: FAQChatProps) {
     try {
       localStorage.setItem('faq-chat-messages', JSON.stringify(messages));
       localStorage.setItem('faq-chat-question-count', questionCount.toString());
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Ошибка сохранения в localStorage:', error);
     }
   };
@@ -50,12 +50,15 @@ export default function FAQChat({ onActivity }: FAQChatProps) {
       if (savedMessages) {
         const parsedMessages = JSON.parse(savedMessages);
         // Преобразуем строки дат обратно в объекты Date
-        return parsedMessages.map((msg: any) => ({
-          ...msg,
-          timestamp: new Date(msg.timestamp)
-        }));
+        return parsedMessages.map((msg: unknown) => {
+          const message = msg as { id: string; type: string; content: string; timestamp: string };
+          return {
+            ...message,
+            timestamp: new Date(message.timestamp)
+          };
+        });
       }
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Ошибка загрузки из localStorage:', error);
     }
     return [];
@@ -153,7 +156,8 @@ export default function FAQChat({ onActivity }: FAQChatProps) {
       setTimeout(() => {
         setShowPopularQuestions(true);
       }, 12000);
-    } catch (error) {
+    } catch (error: unknown) {
+      console.error('Ошибка при поиске FAQ:', error);
       const errorMessage: Message = {
         id: (Date.now() + 1).toString(),
         type: 'bot',
@@ -301,7 +305,8 @@ export default function FAQChat({ onActivity }: FAQChatProps) {
       setTimeout(() => {
         setShowPopularQuestions(true);
       }, 12000);
-    } catch (error) {
+    } catch (error: unknown) {
+      console.error('Ошибка при поиске FAQ (quick question):', error);
       const errorMessage: Message = {
         id: (Date.now() + 1).toString(),
         type: 'bot',

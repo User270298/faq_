@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { MessageCircle, X, Sparkles } from 'lucide-react';
+import { useState } from 'react';
+import { X } from 'lucide-react';
 import FAQChat from './FAQChat';
 import ApplicationForm from './ApplicationForm';
 
@@ -11,15 +11,15 @@ interface FAQWidgetProps {
 }
 
 export default function FAQWidget({
-  autoOpenDelay = 5000,
-  autoHideDelay = 30000
+  // autoOpenDelay = 5000, // Убираем неиспользуемые параметры
+  // autoHideDelay = 30000
 }: FAQWidgetProps) {
   const [isOpen, setIsOpen] = useState(true); // Всегда открыт
   const [showApplication, setShowApplication] = useState(false);
-  const [lastActivity, setLastActivity] = useState(Date.now());
+  // const [lastActivity, setLastActivity] = useState(Date.now()); // Убираем неиспользуемую переменную
 
   const handleActivity = () => {
-    setLastActivity(Date.now());
+    // setLastActivity(Date.now()); // Убираем неиспользуемую переменную
   };
 
   const handleClose = () => {
@@ -27,10 +27,10 @@ export default function FAQWidget({
     setShowApplication(false);
   };
 
-  const handleShowApplication = () => {
-    setShowApplication(true);
-    handleActivity();
-  };
+  // const handleShowApplication = () => { // Убираем неиспользуемую функцию
+  //   setShowApplication(true);
+  //   handleActivity();
+  // };
 
   // Если не открыт, не показываем ничего
   if (!isOpen) {

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { X, Send, User, Mail, Phone, Building } from 'lucide-react';
+import { X, Send, User, Mail, Phone } from 'lucide-react';
 
 interface ApplicationFormProps {
   onClose: () => void;

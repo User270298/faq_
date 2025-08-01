@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://192.168.0.94:8000'; // Замените на ваш IP
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -111,7 +111,7 @@ export const getFAQByKeyword = async (keyword: string): Promise<FAQResponse> => 
   return response.data;
 };
 
-export const getFAQStats = async (): Promise<any> => {
+export const getFAQStats = async (): Promise<Record<string, unknown>> => {
   const response = await api.get('/api/faq/stats');
   return response.data;
 };
@@ -127,7 +127,7 @@ export const getTariffById = async (id: string): Promise<TariffsResponse> => {
   return response.data;
 };
 
-export const calculatePrice = async (tariffId: string, period: string, quantity: number = 1): Promise<any> => {
+export const calculatePrice = async (tariffId: string, period: string, quantity: number = 1): Promise<Record<string, unknown>> => {
   const response = await api.get('/api/tariffs/calculate', {
     params: { tariff_id: tariffId, period, quantity }
   });
@@ -135,7 +135,7 @@ export const calculatePrice = async (tariffId: string, period: string, quantity:
 };
 
 // Application submission
-export const submitApplication = async (data: ApplicationData): Promise<any> => {
+export const submitApplication = async (data: ApplicationData): Promise<Record<string, unknown>> => {
   const response = await api.post('/api/applications/submit', data);
   return response.data;
 };
