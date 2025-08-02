@@ -6,8 +6,15 @@ class Settings(BaseSettings):
     debug: bool = True
     api_prefix: str = "/api"
     
-    # CORS settings
-    cors_origins: List[str] = ["http://localhost:3000", "http://127.0.0.1:3000"]
+    # CORS settings - разрешаем запросы с фронтенда
+    cors_origins: List[str] = [
+        "http://localhost:3000",  # Next.js dev server
+        "http://127.0.0.1:3000",  # Next.js dev server alternative
+        "https://valles-bot.ru",  # Production domain
+        "http://valles-bot.ru",   # HTTP version
+        "http://localhost:5173",  # Vite dev server (если используется)
+        "http://127.0.0.1:5173",  # Vite dev server alternative
+    ]
     
     # Data files
     faq_data_path: str = "data/faq.json"

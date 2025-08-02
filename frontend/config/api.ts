@@ -5,17 +5,17 @@ export const API_CONFIG = {
     baseURL: 'http://localhost:8000',
     timeout: 10000,
   },
-  // Production
+  // Production - подключаемся к локальному бэкенду
   production: {
-    baseURL: process.env.NEXT_PUBLIC_API_URL || 'https://valles-bot.ru/api',
+    baseURL: 'http://localhost:8000', // Локальный бэкенд
     timeout: 15000,
   }
 };
 
 // Get current environment
 export const getApiConfig = () => {
-  const isDev = process.env.NODE_ENV === 'development';
-  return isDev ? API_CONFIG.development : API_CONFIG.production;
+  // Для продакшена всегда используем локальный бэкенд
+  return API_CONFIG.production;
 };
 
 // API endpoints

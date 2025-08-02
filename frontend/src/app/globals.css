@@ -303,6 +303,69 @@ select {
   padding-right: 40px !important;
 }
 
+/* Дополнительные стили для улучшения совместимости */
+/* Safari специфичные стили */
+@media screen and (-webkit-min-device-pixel-ratio: 0) {
+  input[type="text"],
+  input[type="email"],
+  input[type="tel"],
+  input[type="password"],
+  input[type="search"],
+  input[type="url"],
+  input[type="number"],
+  textarea,
+  select {
+    font-size: 16px !important; /* Предотвращает зум на iOS */
+  }
+}
+
+/* Firefox специфичные стили */
+@-moz-document url-prefix() {
+  input[type="text"],
+  input[type="email"],
+  input[type="tel"],
+  input[type="password"],
+  input[type="search"],
+  input[type="url"],
+  input[type="number"],
+  textarea,
+  select {
+    line-height: normal !important;
+  }
+}
+
+/* IE/Edge специфичные стили */
+@media all and (-ms-high-contrast: none), (-ms-high-contrast: active) {
+  input[type="text"],
+  input[type="email"],
+  input[type="tel"],
+  input[type="password"],
+  input[type="search"],
+  input[type="url"],
+  input[type="number"],
+  textarea,
+  select {
+    background-color: #ffffff !important;
+    color: #1f2937 !important;
+  }
+}
+
+/* Стили для темной темы (если браузер поддерживает) */
+@media (prefers-color-scheme: dark) {
+  input[type="text"],
+  input[type="email"],
+  input[type="tel"],
+  input[type="password"],
+  input[type="search"],
+  input[type="url"],
+  input[type="number"],
+  textarea,
+  select {
+    background-color: #ffffff !important;
+    color: #1f2937 !important;
+  }
+}
+
 /* Эффекты кнопок */
 .btn-hover {
   transition: all 0.3s ease;
