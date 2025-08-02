@@ -1,14 +1,23 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  // output: 'export', // Убираем для поддержки API routes
+  output: 'export',
   trailingSlash: true,
+  basePath: '',
+  assetPrefix: '',
   images: {
     unoptimized: true,
   },
-  // Убираем rewrites для статического экспорта
-  assetPrefix: '',
-
+  // Убираем экспериментальные настройки для стабильности
+  webpack: (config, { isServer }) => {
+    if (!isServer) {
+      config.resolve.fallback = {
+        ...config.resolve.fallback,
+        fs: false,
+      };
+    }
+    return config;
+  },
 };
 
 export default nextConfig;

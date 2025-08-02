@@ -316,9 +316,9 @@ export default function Home() {
               для вашего бизнеса
             </h2>
             {/* Floating particles */}
-            <div className="absolute top-10 left-10 w-2 h-2 bg-blue-400 rounded-full animate-bounce opacity-60"></div>
-            <div className="absolute top-20 right-20 w-1 h-1 bg-purple-400 rounded-full animate-bounce opacity-60 delay-500"></div>
-            <div className="absolute bottom-10 left-1/4 w-1.5 h-1.5 bg-pink-400 rounded-full animate-bounce opacity-60 delay-1000"></div>
+            <div className="absolute top-10 left-10 w-2 h-2 bg-blue-400 rounded-full "></div>
+            <div className="absolute top-20 right-20 w-1 h-1 bg-purple-400 rounded-full "></div>
+            <div className="absolute bottom-10 left-1/4 w-1.5 h-1.5 bg-pink-400 rounded-full "></div>
           </div>
 
           {/* Central image with enhanced styling */}
@@ -328,9 +328,9 @@ export default function Home() {
               <div className="absolute inset-0 bg-gradient-to-r from-blue-500/30 via-purple-500/30 to-pink-500/30 rounded-full blur-3xl group-hover:blur-2xl transition-all duration-500 animate-pulse"></div>
               
               {/* Main image container */}
-              <div className="relative w-full h-full rounded-full overflow-hidden border-4 border-white/20 shadow-2xl group-hover:border-white/40 transition-all duration-500">
+              <div className="relative w-full h-full rounded-full overflow-hidden ">
                 <Image
-                  src="/i.jpeg"
+                  src="/humanoid-robot.jpg"
                   alt="AI Chat Bot"
                   fill
                   className="object-cover group-hover:scale-110 transition-transform duration-700"
@@ -343,12 +343,10 @@ export default function Home() {
                 {/* Floating elements around image */}
                 <div className="absolute -top-4 -left-4 w-8 h-8 bg-blue-400 rounded-full animate-bounce opacity-80"></div>
                 <div className="absolute -bottom-4 -right-4 w-6 h-6 bg-purple-400 rounded-full animate-bounce opacity-80 delay-300"></div>
-                <div className="absolute top-1/2 -right-6 w-4 h-4 bg-pink-400 rounded-full animate-bounce opacity-80 delay-500"></div>
-              </div>
+                <div className="absolute top-1/2 -right-6 w-4 h-4 bg-pink-400 rounded-full animate-bounce opacity-80 delay-500"></div> 
+              </div> 
               
-              {/* Rotating ring effect */}
-              <div className="absolute inset-0 border-2 border-blue-400/30 rounded-full animate-spin-slow"></div>
-              <div className="absolute inset-4 border-2 border-purple-400/20 rounded-full animate-spin-slow-reverse"></div>
+              
             </div>
           </div>
 
@@ -426,7 +424,7 @@ export default function Home() {
             {/* Main image container */}
             <div className="relative w-full h-full rounded-full overflow-hidden border-4 border-white/20 shadow-2xl group-hover:border-white/40 transition-all duration-500">
               <Image
-                src="/i.jpeg"
+                src="/humanoid-robot.jpg"
                 alt="AI Chat Bot"
                 fill
                 className="object-cover group-hover:scale-110 transition-transform duration-700"

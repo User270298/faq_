@@ -1,12 +1,15 @@
 import axios from 'axios';
+import { getApiConfig } from '../../config/api';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || ''; // Используем относительные пути для API routes
+// Настройка API для работы с FastAPI бэкендом
+const config = getApiConfig();
 
 const api = axios.create({
-  baseURL: API_BASE_URL,
+  baseURL: config.baseURL,
   headers: {
     'Content-Type': 'application/json',
   },
+  timeout: config.timeout,
 });
 
 // Типы для API
@@ -22,7 +25,7 @@ export interface FAQItem {
 }
 
 export interface FAQResponse {
-  success: boolean;
+  success?: boolean;
   data?: {
     faq: FAQItem[];
     categories: Record<string, string>;
@@ -34,6 +37,9 @@ export interface FAQResponse {
     };
   };
   message?: string;
+  // FastAPI может возвращать данные напрямую
+  faq?: FAQItem[];
+  categories?: Record<string, string>;
 }
 
 export interface Tariff {
@@ -51,7 +57,7 @@ export interface Tariff {
 }
 
 export interface TariffsResponse {
-  success: boolean;
+  success?: boolean;
   data?: {
     tariffs: Tariff[];
     metadata?: {
@@ -61,6 +67,8 @@ export interface TariffsResponse {
     };
   };
   message?: string;
+  // FastAPI может возвращать данные напрямую
+  tariffs?: Tariff[];
 }
 
 export interface ApplicationData {

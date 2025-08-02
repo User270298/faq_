@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://valles-bot.ru/sitemap.xml 
