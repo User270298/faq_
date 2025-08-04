@@ -2,34 +2,57 @@
 
 import { useState } from 'react';
 import { X, Send, User, Mail, Phone } from 'lucide-react';
+import { submitApplication } from '../services/applicationService';
 
 interface ApplicationFormProps {
   onClose: () => void;
   onBack?: () => void;
   onActivity?: () => void;
   onSuccess?: () => void;
+  selectedTariff?: string;
 }
 
-export default function ApplicationForm({ onClose, onBack, onActivity, onSuccess }: ApplicationFormProps) {
+export default function ApplicationForm({ onClose, onBack, onActivity, onSuccess, selectedTariff }: ApplicationFormProps) {
   const [formData, setFormData] = useState({
     name: '',
     email: '',
-    phone: ''
+    phone: '',
+    message: ''
   });
 
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState('');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
+    setError('');
     onActivity?.();
     
-    // Здесь будет отправка данных на сервер
-    setTimeout(() => {
+    try {
+      // Отправляем заявку на бэкенд
+      const applicationData = {
+        name: formData.name,
+        email: formData.email,
+        phone: formData.phone,
+        selectedTariff: selectedTariff || 'Не выбран',
+        message: formData.message || ''
+      };
+
+      console.log('Отправка заявки:', applicationData);
+      
+      const result = await submitApplication(applicationData);
+      
+      console.log('Заявка отправлена успешно:', result);
+      
       setIsSubmitting(false);
       onSuccess?.();
       onClose();
-    }, 2000);
+    } catch (error) {
+      console.error('Ошибка при отправке заявки:', error);
+      setError('Ошибка при отправке заявки. Попробуйте еще раз.');
+      setIsSubmitting(false);
+    }
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
@@ -151,6 +174,37 @@ export default function ApplicationForm({ onClose, onBack, onActivity, onSuccess
                 placeholder="+7 (999) 123-45-67"
               />
           </div>
+
+          {/* Message */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Сообщение
+            </label>
+            <textarea
+              name="message"
+              value={formData.message}
+              onChange={handleChange}
+              onFocus={() => onActivity?.()}
+              rows={3}
+              className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-300 text-gray-900 placeholder-gray-500 bg-white !bg-white resize-none"
+              style={{ 
+                backgroundColor: 'white',
+                color: 'black',
+                WebkitAppearance: 'none',
+                MozAppearance: 'none',
+                appearance: 'none',
+                borderColor: '#d1d5db'
+              }}
+              placeholder="Дополнительная информация (необязательно)"
+            />
+          </div>
+
+          {/* Error Message */}
+          {error && (
+            <div className="text-red-500 text-sm bg-red-50 p-3 rounded-lg">
+              {error}
+            </div>
+          )}
 
           {/* Submit Button */}
           <button

@@ -1,4 +1,21 @@
 import { ApplicationCreate, ApplicationResponse } from '@/types/api';
+import api from '@/lib/api';
+
+// Функция для отправки заявки на бэкенд
+export async function submitApplication(applicationData: ApplicationCreate): Promise<ApplicationResponse> {
+  try {
+    console.log('Отправка заявки на бэкенд:', applicationData);
+    
+    const response = await api.post('/applications/submit', applicationData);
+    
+    console.log('Ответ от бэкенда:', response.data);
+    
+    return response.data;
+  } catch (error) {
+    console.error('Ошибка при отправке заявки на бэкенд:', error);
+    throw new Error('Не удалось отправить заявку. Попробуйте еще раз.');
+  }
+}
 
 export class ApplicationService {
   private applications: Array<{

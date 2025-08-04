@@ -1,10 +1,22 @@
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Request
 from typing import List, Dict
+import logging
+from datetime import datetime
 from services import FAQService, TariffsService, application_service
 from models import (
     FAQResponse, FAQItem, FAQCategories, FAQData, TariffsResponse, Tariff, TariffDiscounts,
     FAQCreate, FAQUpdate, FAQStats, ApplicationCreate, ApplicationResponse
 )
+
+# Настройка логирования только в консоль
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.StreamHandler()
+    ]
+)
+logger = logging.getLogger(__name__)
 
 # Create router instances
 faq_router = APIRouter()
@@ -229,10 +241,49 @@ async def calculate_price_with_discount(
 applications_router = APIRouter()
 
 @applications_router.post("/submit", response_model=ApplicationResponse)
-async def submit_application(application: ApplicationCreate):
+async def submit_application(application: ApplicationCreate, request: Request):
     """Отправка заявки"""
     try:
-        result = await application_service.submit_application(application.dict())
+        # Получаем IP адрес клиента
+        client_ip = request.client.host
+        if request.headers.get("x-forwarded-for"):
+            client_ip = request.headers.get("x-forwarded-for").split(",")[0].strip()
+        elif request.headers.get("x-real-ip"):
+            client_ip = request.headers.get("x-real-ip")
+        
+        # Добавляем IP в данные заявки
+        application_data = application.dict()
+        application_data['client_ip'] = client_ip
+        
+        # Логируем получение заявки
+        logger.info(f"📝 НОВАЯ ЗАЯВКА ПОЛУЧЕНА:")
+        logger.info(f"   Имя: {application.name}")
+        logger.info(f"   Email: {application.email}")
+        logger.info(f"   Телефон: {application.phone}")
+        logger.info(f"   Тариф: {application.selectedTariff}")
+        logger.info(f"   Сообщение: {application.message or 'Не указано'}")
+        logger.info(f"   IP: {client_ip}")
+        logger.info(f"   Время: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+        logger.info(f"   User-Agent: {request.headers.get('user-agent', 'Неизвестно')}")
+        logger.info("-" * 50)
+        
+        # Обрабатываем заявку
+        result = await application_service.submit_application(application_data)
+        
+        # Логируем успешную обработку
+        logger.info(f"✅ ЗАЯВКА ОБРАБОТАНА УСПЕШНО:")
+        logger.info(f"   ID: {result.get('application_id', 'Неизвестно')}")
+        logger.info(f"   Статус: {result.get('success', 'Неизвестно')}")
+        logger.info("=" * 50)
+        
         return ApplicationResponse(**result)
     except Exception as e:
+        # Логируем ошибку
+        logger.error(f"❌ ОШИБКА ПРИ ОБРАБОТКЕ ЗАЯВКИ:")
+        logger.error(f"   Имя: {application.name}")
+        logger.error(f"   Email: {application.email}")
+        logger.error(f"   IP: {client_ip if 'client_ip' in locals() else 'Неизвестно'}")
+        logger.error(f"   Ошибка: {str(e)}")
+        logger.error("=" * 50)
+        
         raise HTTPException(status_code=500, detail=str(e)) 
