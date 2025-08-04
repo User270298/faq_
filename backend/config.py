@@ -12,8 +12,11 @@ class Settings(BaseSettings):
         "http://127.0.0.1:3000",  # Next.js dev server alternative
         "https://valles-bot.ru",  # Production domain
         "http://valles-bot.ru",   # HTTP version
+        "https://217.199.252.234.nip.io",  # VPS domain with SSL
+        "http://217.199.252.234.nip.io",   # VPS domain HTTP
         "http://localhost:5173",  # Vite dev server (если используется)
         "http://127.0.0.1:5173",  # Vite dev server alternative
+        "*",  # Разрешаем все домены (временно для тестирования)
     ]
     
     # Data files

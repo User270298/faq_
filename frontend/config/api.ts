@@ -5,16 +5,16 @@ export const API_CONFIG = {
     baseURL: 'http://localhost:8000',
     timeout: 10000,
   },
-  // Production - подключаемся к локальному бэкенду
+  // Production - используем VPS сервер с SSL сертификатом
   production: {
-    baseURL: 'http://localhost:8000', // Локальный бэкенд
+    baseURL: 'https://217.199.252.234.nip.io', // VPS сервер с SSL
     timeout: 15000,
   }
 };
 
 // Get current environment
 export const getApiConfig = () => {
-  // Для продакшена всегда используем локальный бэкенд
+  // Для продакшена используем VPS сервер
   return API_CONFIG.production;
 };
 
