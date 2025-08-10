@@ -8,6 +8,12 @@ from models import FAQData, FAQItem, FAQCategories, FAQMetadata, TariffsData, Ta
 from config import settings
 import time
 import logging
+import smtplib
+from email.mime.text import MIMEText
+from email.header import Header
+import requests
+import gspread
+from google.oauth2.service_account import Credentials
 
 logger = logging.getLogger(__name__)
 
@@ -357,9 +363,9 @@ class ApplicationService:
     """Сервис для обработки заявок"""
     
     def __init__(self):
-        self.admin_email = "admin@example.com"  # В продакшене брать из конфига
-        self.telegram_bot_token = "YOUR_BOT_TOKEN"  # В продакшене брать из конфига
-        self.telegram_chat_id = "YOUR_CHAT_ID"  # В продакшене брать из конфига
+        self.admin_email = settings.admin_email
+        self.telegram_bot_token = settings.telegram_bot_token
+        self.telegram_chat_id = settings.telegram_chat_id
     
     async def submit_application(self, application_data: dict) -> dict:
         """Отправка заявки на email и в Telegram"""
@@ -376,6 +382,13 @@ class ApplicationService:
             # Отправляем в Telegram (в продакшене использовать реальный Telegram API)
             await self._send_telegram_notification(message)
             
+            # Пишем в Google Sheets (если включено)
+            try:
+                if settings.google_sheets_enabled:
+                    self._append_to_google_sheets(application_data, application_id)
+            except Exception as gs_err:
+                logger.error(f"Google Sheets append failed: {gs_err}")
+            
             return {
                 "success": True,
                 "message": "Заявка успешно отправлена",
@@ -388,6 +401,44 @@ class ApplicationService:
                 "success": False,
                 "message": "Ошибка при отправке заявки"
             }
+
+    def _get_gs_client(self) -> gspread.Client:
+        scopes = [
+            'https://www.googleapis.com/auth/spreadsheets',
+            'https://www.googleapis.com/auth/drive'
+        ]
+        if settings.google_service_account_json:
+            import json as _json
+            info = _json.loads(settings.google_service_account_json)
+            creds = Credentials.from_service_account_info(info, scopes=scopes)
+        elif settings.google_service_account_json_path:
+            creds = Credentials.from_service_account_file(settings.google_service_account_json_path, scopes=scopes)
+        else:
+            raise RuntimeError('Google service account credentials not configured')
+        return gspread.authorize(creds)
+
+    def _append_to_google_sheets(self, data: dict, app_id: str) -> None:
+        if not settings.google_spreadsheet_id:
+            raise RuntimeError('google_spreadsheet_id is empty')
+        client = self._get_gs_client()
+        sh = client.open_by_key(settings.google_spreadsheet_id)
+        try:
+            ws = sh.worksheet(settings.google_worksheet_name)
+        except gspread.WorksheetNotFound:
+            ws = sh.add_worksheet(title=settings.google_worksheet_name, rows=1000, cols=20)
+            # Заголовки
+            ws.append_row(['ID', 'Имя', 'Email', 'Телефон', 'Тариф', 'Сообщение', 'IP', 'User-Agent', 'Время'])
+        ws.append_row([
+            app_id,
+            data.get('name', ''),
+            data.get('email', ''),
+            data.get('phone', ''),
+            data.get('selectedTariff', ''),
+            data.get('message', ''),
+            data.get('client_ip', ''),
+            data.get('user_agent', ''),
+            datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        ])
     
     def _format_application_message(self, data: dict, app_id: str) -> str:
         """Форматирование сообщения заявки"""
@@ -404,16 +455,56 @@ class ApplicationService:
         """.strip()
     
     async def _send_email_notification(self, message: str):
-        """Отправка уведомления на email (заглушка)"""
-        # В продакшене здесь будет реальная отправка email
-        logger.info(f"Email notification: {message}")
-        pass
+        """Отправка уведомления на email через SMTP"""
+        try:
+            if not self.admin_email or not settings.smtp_host or not (settings.smtp_user or settings.smtp_from):
+                logger.info("SMTP settings are not configured; skipping email notification")
+                return
+
+            subject = "Новая заявка"
+            from_addr = settings.smtp_from or settings.smtp_user
+            to_addr = self.admin_email
+
+            mime_msg = MIMEText(message, _charset='utf-8')
+            mime_msg['Subject'] = Header(subject, 'utf-8')
+            mime_msg['From'] = from_addr
+            mime_msg['To'] = to_addr
+
+            # TLS (587) или SSL (465)
+            if settings.smtp_use_tls and settings.smtp_port == 587:
+                server = smtplib.SMTP(settings.smtp_host, settings.smtp_port, timeout=10)
+                server.ehlo()
+                server.starttls()
+                server.login(settings.smtp_user, settings.smtp_password)
+            else:
+                server = smtplib.SMTP_SSL(settings.smtp_host, settings.smtp_port, timeout=10)
+                server.login(settings.smtp_user, settings.smtp_password)
+
+            server.sendmail(from_addr, [to_addr], mime_msg.as_string())
+            server.quit()
+            logger.info("Email notification sent")
+        except Exception as e:
+            logger.error(f"Failed to send email notification: {e}")
     
     async def _send_telegram_notification(self, message: str):
-        """Отправка уведомления в Telegram (заглушка)"""
-        # В продакшене здесь будет реальная отправка в Telegram
-        logger.info(f"Telegram notification: {message}")
-        pass
+        """Отправка уведомления в Telegram через Bot API"""
+        try:
+            if not self.telegram_bot_token or not self.telegram_chat_id:
+                logger.info("Telegram settings are not configured; skipping telegram notification")
+                return
+            url = f"https://api.telegram.org/bot{self.telegram_bot_token}/sendMessage"
+            payload = {
+                'chat_id': self.telegram_chat_id,
+                'text': message,
+                'parse_mode': 'HTML'
+            }
+            resp = requests.post(url, json=payload, timeout=10)
+            if resp.status_code != 200:
+                logger.error(f"Telegram send failed: {resp.status_code} {resp.text}")
+            else:
+                logger.info("Telegram notification sent")
+        except Exception as e:
+            logger.error(f"Failed to send telegram notification: {e}")
 
 # Создаем экземпляр сервиса
 application_service = ApplicationService() 

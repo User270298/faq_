@@ -3,6 +3,7 @@ from typing import List, Dict
 import logging
 from datetime import datetime
 from services import FAQService, TariffsService, application_service
+
 from models import (
     FAQResponse, FAQItem, FAQCategories, FAQData, TariffsResponse, Tariff, TariffDiscounts,
     FAQCreate, FAQUpdate, FAQStats, ApplicationCreate, ApplicationResponse
@@ -121,6 +122,7 @@ async def get_faq_stats():
         return faq_service.get_faq_stats()
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
 
 # Admin FAQ Routes (for managing FAQ content)
 @faq_router.post("/admin/add", response_model=FAQItem)
@@ -251,9 +253,10 @@ async def submit_application(application: ApplicationCreate, request: Request):
         elif request.headers.get("x-real-ip"):
             client_ip = request.headers.get("x-real-ip")
         
-        # Добавляем IP в данные заявки
+        # Добавляем IP и User-Agent в данные заявки
         application_data = application.dict()
         application_data['client_ip'] = client_ip
+        application_data['user_agent'] = request.headers.get('user-agent', 'Неизвестно')
         
         # Логируем получение заявки
         logger.info(f"📝 НОВАЯ ЗАЯВКА ПОЛУЧЕНА:")
