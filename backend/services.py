@@ -17,6 +17,17 @@ from google.oauth2.service_account import Credentials
 
 logger = logging.getLogger(__name__)
 
+def _mask_secret(value: str, keep: int = 4) -> str:
+    try:
+        if not value:
+            return "<empty>"
+        if len(value) <= keep:
+            return "*" * len(value)
+        masked = "*" * (len(value) - keep) + value[-keep:]
+        return masked
+    except Exception:
+        return "<hidden>"
+
 class FAQService:
     def __init__(self):
         self.data_path = settings.faq_data_path
@@ -111,6 +122,93 @@ class FAQService:
             logger.error(f"Error in search_faq: {e}")
             # Return empty list instead of raising exception
             return []
+
+    def ai_search(self, query: str) -> dict:
+        """AI-like search without external libs: simple weighted scoring and suggestions"""
+        data = self._load_data()
+        q = query.strip()
+        if not q:
+            return {"success": False, "query": query, "results_count": 0, "matches": [], "suggestions": [], "message": "Empty query"}
+
+        def normalize(text: str) -> str:
+            return text.lower().replace('ё', 'е')
+
+        def tokenize(text: str) -> List[str]:
+            import re
+            t = normalize(text)
+            return [tok for tok in re.split(r"[^a-zа-я0-9]+", t) if tok]
+
+        qnorm = normalize(q)
+        qtokens = set(tokenize(q))
+
+        scored: List[tuple[FAQItem, float, str]] = []
+        for item in data.faq:
+            question = normalize(item.question)
+            answer = normalize(item.answer)
+            keywords = [normalize(k) for k in (item.keywords or [])]
+
+            # Простые баллы: точные вхождения и пересечения токенов
+            question_score = 0.0
+            if qnorm and qnorm in question:
+                question_score += 80.0
+            qtokens_item = set(tokenize(item.question))
+            if qtokens_item:
+                overlap_q = len(qtokens & qtokens_item) / len(qtokens_item)
+                question_score += overlap_q * 40.0
+
+            keyword_score = 0.0
+            if keywords:
+                kw_overlap = 0
+                for kw in keywords:
+                    if kw in qnorm:
+                        keyword_score += 30.0
+                    kw_tokens = set(tokenize(kw))
+                    if kw_tokens & qtokens:
+                        kw_overlap += 1
+                if len(keywords) > 0:
+                    keyword_score += (kw_overlap / len(keywords)) * 40.0
+
+            answer_score = 0.0
+            if qnorm in answer:
+                answer_score += 10.0
+
+            score = question_score * 0.6 + keyword_score * 0.3 + answer_score * 0.1
+            if score > 1:
+                # Определяем тип совпадения по наибольшему компоненту
+                mtype = "question"
+                if keyword_score >= question_score and keyword_score >= answer_score:
+                    mtype = "keywords"
+                elif answer_score >= question_score and answer_score >= keyword_score:
+                    mtype = "answer"
+                scored.append((item, score, mtype))
+
+        scored.sort(key=lambda x: x[1], reverse=True)
+
+        matches = [
+            {
+                "id": item.id,
+                "question": item.question,
+                "answer": item.answer,
+                "keywords": item.keywords,
+                "category": item.category,
+                "relevance_score": int(round(min(score, 100))),
+                "match_type": mtype,
+            }
+            for item, score, mtype in scored[:10]
+        ]
+
+        if len(scored) > 1:
+            suggestions = [it.question for it, _, _ in scored[1:6]]
+        else:
+            suggestions = [it.question for it in self.get_popular_questions(5)]
+
+        return {
+            "success": True,
+            "query": query,
+            "results_count": len(matches),
+            "matches": matches,
+            "suggestions": suggestions,
+        }
     
     def get_faq_by_id(self, faq_id: int) -> Optional[FAQItem]:
         """Get FAQ item by ID"""
@@ -375,17 +473,44 @@ class ApplicationService:
             
             # Формируем сообщение
             message = self._format_application_message(application_data, application_id)
+            logger.info(
+                "[APP] Start submit | id=%s | email_to=%s | tg_chat=%s | gs_enabled=%s",
+                application_id,
+                self.admin_email,
+                self.telegram_chat_id,
+                getattr(settings, "google_sheets_enabled", False),
+            )
             
             # Отправляем на email (в продакшене использовать реальный email сервис)
+            logger.info(
+                "[EMAIL] Prepare | host=%s | port=%s | tls=%s | from=%s | to=%s",
+                getattr(settings, "smtp_host", ""),
+                getattr(settings, "smtp_port", ""),
+                getattr(settings, "smtp_use_tls", ""),
+                getattr(settings, "smtp_from", '') or getattr(settings, "smtp_user", ''),
+                self.admin_email,
+            )
             await self._send_email_notification(message)
             
             # Отправляем в Telegram (в продакшене использовать реальный Telegram API)
+            logger.info(
+                "[TG] Prepare | chat_id=%s | token=%s | text_len=%d",
+                self.telegram_chat_id,
+                _mask_secret(self.telegram_bot_token),
+                len(message),
+            )
             await self._send_telegram_notification(message)
             
             # Пишем в Google Sheets (если включено)
             try:
                 if settings.google_sheets_enabled:
+                    logger.info(
+                        "[GS] Append begin | spreadsheet_id=%s | worksheet=%s",
+                        getattr(settings, "google_spreadsheet_id", ""),
+                        getattr(settings, "google_worksheet_name", ""),
+                    )
                     self._append_to_google_sheets(application_data, application_id)
+                    logger.info("[GS] Append done | id=%s", application_id)
             except Exception as gs_err:
                 logger.error(f"Google Sheets append failed: {gs_err}")
             
@@ -403,6 +528,9 @@ class ApplicationService:
             }
 
     def _get_gs_client(self) -> gspread.Client:
+        logger.info("[GS] Build client | json_path=%s | json_inline=%s",
+                    bool(getattr(settings, 'google_service_account_json_path', '')),
+                    bool(getattr(settings, 'google_service_account_json', '')))
         scopes = [
             'https://www.googleapis.com/auth/spreadsheets',
             'https://www.googleapis.com/auth/drive'
@@ -425,10 +553,11 @@ class ApplicationService:
         try:
             ws = sh.worksheet(settings.google_worksheet_name)
         except gspread.WorksheetNotFound:
+            logger.info("[GS] Worksheet missing, creating | title=%s", settings.google_worksheet_name)
             ws = sh.add_worksheet(title=settings.google_worksheet_name, rows=1000, cols=20)
             # Заголовки
             ws.append_row(['ID', 'Имя', 'Email', 'Телефон', 'Тариф', 'Сообщение', 'IP', 'User-Agent', 'Время'])
-        ws.append_row([
+        row = [
             app_id,
             data.get('name', ''),
             data.get('email', ''),
@@ -438,7 +567,9 @@ class ApplicationService:
             data.get('client_ip', ''),
             data.get('user_agent', ''),
             datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-        ])
+        ]
+        logger.info("[GS] Append row | cols=%d | id=%s", len(row), app_id)
+        ws.append_row(row)
     
     def _format_application_message(self, data: dict, app_id: str) -> str:
         """Форматирование сообщения заявки"""
@@ -458,7 +589,7 @@ class ApplicationService:
         """Отправка уведомления на email через SMTP"""
         try:
             if not self.admin_email or not settings.smtp_host or not (settings.smtp_user or settings.smtp_from):
-                logger.info("SMTP settings are not configured; skipping email notification")
+                logger.warning("[EMAIL] Skipped: missing settings admin_email/smtp_host/smtp_user|smtp_from")
                 return
 
             subject = "Новая заявка"
@@ -472,25 +603,27 @@ class ApplicationService:
 
             # TLS (587) или SSL (465)
             if settings.smtp_use_tls and settings.smtp_port == 587:
+                logger.info("[EMAIL] Using STARTTLS | host=%s:%s", settings.smtp_host, settings.smtp_port)
                 server = smtplib.SMTP(settings.smtp_host, settings.smtp_port, timeout=10)
                 server.ehlo()
                 server.starttls()
                 server.login(settings.smtp_user, settings.smtp_password)
             else:
+                logger.info("[EMAIL] Using SSL | host=%s:%s", settings.smtp_host, settings.smtp_port)
                 server = smtplib.SMTP_SSL(settings.smtp_host, settings.smtp_port, timeout=10)
                 server.login(settings.smtp_user, settings.smtp_password)
 
             server.sendmail(from_addr, [to_addr], mime_msg.as_string())
             server.quit()
-            logger.info("Email notification sent")
+            logger.info("[EMAIL] Sent | from=%s | to=%s", from_addr, to_addr)
         except Exception as e:
-            logger.error(f"Failed to send email notification: {e}")
+            logger.error(f"[EMAIL] Failed: {e}")
     
     async def _send_telegram_notification(self, message: str):
         """Отправка уведомления в Telegram через Bot API"""
         try:
             if not self.telegram_bot_token or not self.telegram_chat_id:
-                logger.info("Telegram settings are not configured; skipping telegram notification")
+                logger.warning("[TG] Skipped: missing bot_token or chat_id")
                 return
             url = f"https://api.telegram.org/bot{self.telegram_bot_token}/sendMessage"
             payload = {
@@ -498,13 +631,14 @@ class ApplicationService:
                 'text': message,
                 'parse_mode': 'HTML'
             }
+            logger.info("[TG] POST %s | chat_id=%s | text_len=%d", url, self.telegram_chat_id, len(message))
             resp = requests.post(url, json=payload, timeout=10)
             if resp.status_code != 200:
-                logger.error(f"Telegram send failed: {resp.status_code} {resp.text}")
+                logger.error("[TG] Failed | status=%s | body=%s", resp.status_code, resp.text[:200].replace('\n',' '))
             else:
-                logger.info("Telegram notification sent")
+                logger.info("[TG] Sent | status=%s", resp.status_code)
         except Exception as e:
-            logger.error(f"Failed to send telegram notification: {e}")
+            logger.error(f"[TG] Exception: {e}")
 
 # Создаем экземпляр сервиса
 application_service = ApplicationService() 

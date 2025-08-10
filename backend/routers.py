@@ -6,7 +6,7 @@ from services import FAQService, TariffsService, application_service
 
 from models import (
     FAQResponse, FAQItem, FAQCategories, FAQData, TariffsResponse, Tariff, TariffDiscounts,
-    FAQCreate, FAQUpdate, FAQStats, ApplicationCreate, ApplicationResponse
+    FAQCreate, FAQUpdate, FAQStats, ApplicationCreate, ApplicationResponse, AISearchResponse
 )
 
 # Настройка логирования только в консоль
@@ -68,6 +68,19 @@ async def search_faq(q: str = Query(..., description="Search query")):
         results = faq_service.search_faq(q)
         categories = faq_service.get_categories()
         return FAQResponse(success=True, data=FAQData(faq=results, categories=categories))
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@faq_router.get("/ai-search", response_model=AISearchResponse)
+async def ai_search(q: str = Query(..., description="Search query for AI search")):
+    """Fuzzy AI-like search returning ranked matches and suggestions"""
+    try:
+        if not q.strip():
+            raise HTTPException(status_code=400, detail="Search query cannot be empty")
+        result = faq_service.ai_search(q)
+        return AISearchResponse(**result)
     except HTTPException:
         raise
     except Exception as e:

@@ -7,7 +7,7 @@ class Settings(BaseSettings):
     api_prefix: str = "/api"
     
     # CORS settings - разрешаем запросы с фронтенда
-    cors_origins: List[str] = ["*"
+    cors_origins: List[str] = [
         "http://localhost:3000",  # Next.js dev server
         "http://127.0.0.1:3000",  # Next.js dev server alternative
         "https://valles-bot.ru",  # Production domain
@@ -24,24 +24,24 @@ class Settings(BaseSettings):
     tariffs_data_path: str = "data/tariffs.json"
 
     # Email settings
-    admin_email: str = "admin@example.com"  # Email администратора для уведомлений
-    smtp_host: str = ""
-    smtp_port: int = 587
-    smtp_user: str = ""
-    smtp_password: str = ""
-    smtp_from: str = ""  # Если пусто, использовать smtp_user
-    smtp_use_tls: bool = True  # STARTTLS (порт 587); для SSL (465) установите False и используйте SMTP_SSL
+    admin_email: str = "parkwoodoleg@yandex.ru"  # Email администратора для уведомлений
+    smtp_host: str = "smtp.yandex.ru"
+    smtp_port: int = 465 
+    smtp_user: str = "parkwoodoleg@yandex.ru"
+    smtp_password: str = "parkwood2702"
+    smtp_from: str = "parkwoodoleg@yandex.ru"  # Если пусто, использовать smtp_user
+    smtp_use_tls: bool = False  # STARTTLS (порт 587); для SSL (465) установите False и используйте SMTP_SSL
 
     # Telegram settings
-    telegram_bot_token: str = ""
-    telegram_chat_id: str = ""
+    telegram_bot_token: str = "8014660296:AAGIcduqoTLp_y7_hRvlNJKxlIfV_QoDt-s"
+    telegram_chat_id: str = "-1002768477989"
 
     # Google Sheets settings
-    google_sheets_enabled: bool = False
-    google_spreadsheet_id: str = ""
+    google_sheets_enabled: bool = True
+    google_spreadsheet_id: str = "1TVjvzHo91e5ZmSCWns9L5WOvGwurEDIjFNK8SBN2yes"
     google_worksheet_name: str = "Applications"
     # Один из вариантов ниже должен быть задан
-    google_service_account_json_path: str = ""  # путь к .json ключу сервисного аккаунта
+    google_service_account_json_path: str = "/root/backend_valles_bot/acoustic-spot-423313-g5-b9316d0f3544.json"  # путь к .json ключу сервисного аккаунта
     google_service_account_json: str = ""       # или содержимое JSON (можно через переменную окружения)
     
     class Config:

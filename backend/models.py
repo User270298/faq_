@@ -35,6 +35,23 @@ class FAQResponse(BaseModel):
     data: Optional[FAQData] = None
     message: Optional[str] = None
 
+class AISearchResult(BaseModel):
+    id: int
+    question: str
+    answer: str
+    keywords: List[str]
+    category: str
+    relevance_score: int
+    match_type: str
+
+class AISearchResponse(BaseModel):
+    success: bool
+    query: str
+    results_count: int
+    matches: List[AISearchResult]
+    suggestions: List[str]
+    message: Optional[str] = None
+
 # Tariffs Models
 class Tariff(BaseModel):
     id: str

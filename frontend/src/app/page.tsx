@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import Image from 'next/image';
 import { Send, Bot, User, FileText, Sparkles, MessageCircle, X, Mail, Phone } from 'lucide-react';
-import { searchFAQ, aiSearchFAQ, AISearchResponse } from '@/lib/api';
+import { searchFAQ, aiSearchFAQ, AISearchResponse, submitApplication as submitApplicationApi } from '@/lib/api';
 import ReactMarkdown from 'react-markdown';
 import { TariffsService } from '@/services/tariffsService';
 import type { Tariff as TariffItem } from '@/types/api';
@@ -36,7 +36,7 @@ export default function Home() {
   const [isSubmitted, setIsSubmitted] = useState(false);
   // Состояния диалога (пошаговая логика)
   const [currentStep, setCurrentStep] = useState<'welcome' | 'faq' | 'tariff_list' | 'tariff_selected'>('welcome');
-  const [stepHistory, setStepHistory] = useState<Array<'welcome' | 'faq' | 'tariff_list' | 'tariff_selected'>>([]);
+  const [, setStepHistory] = useState<Array<'welcome' | 'faq' | 'tariff_list' | 'tariff_selected'>>([]);
   const [tariffs, setTariffs] = useState<TariffItem[]>([]);
   const [selectedTariffId, setSelectedTariffId] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -187,15 +187,7 @@ export default function Home() {
       const aiResponse: AISearchResponse = await aiSearchFAQ(inputValue);
       if (aiResponse.success && aiResponse.matches && aiResponse.matches.length > 0) {
         const best = aiResponse.matches[0];
-        let botContent = `**Ближайший вопрос:** ${best.question}\n\n${best.answer}`;
-        if (aiResponse.matches.length > 1) {
-          botContent += `\n\n🔍 **Похожие вопросы:**`;
-          for (let i = 1; i < Math.min(3, aiResponse.matches.length); i++) {
-            const m = aiResponse.matches[i];
-            botContent += `\n• ${m.question} (${m.relevance_score}%)`;
-          }
-        }
-        const botMessage: Message = { id: (Date.now() + 1).toString(), type: 'bot', content: botContent, timestamp: new Date() };
+        const botMessage: Message = { id: (Date.now() + 1).toString(), type: 'bot', content: best.answer, timestamp: new Date() };
         setMessages(prev => [...prev, botMessage]);
       } else {
         // 2) Поиск по ключевым словам на бэкенде
@@ -205,7 +197,7 @@ export default function Home() {
           const botMessage: Message = {
             id: (Date.now() + 1).toString(),
             type: 'bot',
-            content: `**Ближайший вопрос:** ${top.question}\n\n${top.answer}`,
+            content: top.answer,
             timestamp: new Date()
           };
           setMessages(prev => [...prev, botMessage]);
@@ -218,7 +210,7 @@ export default function Home() {
             const botMessage: Message = {
               id: (Date.now() + 1).toString(),
               type: 'bot',
-              content: `**Ближайший вопрос:** ${top.question}\n\n${top.answer}`,
+              content: top.answer,
               timestamp: new Date()
             };
             setMessages(prev => [...prev, botMessage]);
@@ -277,7 +269,7 @@ export default function Home() {
         const botMessage: Message = {
           id: (Date.now() + 1).toString(),
           type: 'bot',
-          content: `**Ближайший вопрос:** ${best.question}\n\n${best.answer}`,
+          content: best.answer,
           timestamp: new Date()
         };
         setMessages(prev => [...prev, botMessage]);
@@ -288,7 +280,7 @@ export default function Home() {
           const botMessage: Message = {
             id: (Date.now() + 1).toString(),
             type: 'bot',
-            content: `**Ближайший вопрос:** ${top.question}\n\n${top.answer}`,
+            content: top.answer,
             timestamp: new Date()
           };
           setMessages(prev => [...prev, botMessage]);
@@ -384,18 +376,11 @@ export default function Home() {
 
     try {
       console.log('📤 Отправляем заявку:', applicationForm);
-      // Отправляем данные на бэкенд
-                      const response = await fetch('/api/applications/submit', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(applicationForm),
-      });
+      const resp = await submitApplicationApi(applicationForm);
+      console.log('📥 Ответ сервера (axios):', resp);
+      const isSuccess = (resp as { success?: boolean }).success !== false;
 
-      console.log('📥 Ответ сервера:', response.status);
-
-      if (response.ok) {
+      if (isSuccess) {
         console.log('✅ Заявка успешно отправлена');
         setIsSubmitted(true);
         setTimeout(() => {
@@ -414,9 +399,7 @@ export default function Home() {
           setMessages(prev => [...prev, botMessage]);
         }, 2000);
       } else {
-        console.error('❌ Ошибка сервера:', response.status, response.statusText);
-        const errorText = await response.text();
-        console.error('❌ Текст ошибки:', errorText);
+        console.error('❌ Ошибка сервера при отправке заявки:', resp);
       }
     } catch (error: unknown) {
       console.error('❌ Ошибка отправки заявки:', error);
@@ -441,7 +424,6 @@ export default function Home() {
   // Настраиваем размеры контейнера и панели по шагам
   const isWelcomeStep = currentStep === 'welcome';
   const isFaqStep = currentStep === 'faq';
-  const isTariffStep = currentStep === 'tariff_list' || currentStep === 'tariff_selected';
   const containerMaxWidthClass = isWelcomeStep ? 'max-w-xl' : isFaqStep ? 'max-w-4xl' : 'max-w-3xl';
   const panelHeightPx = isWelcomeStep ? 280 : isFaqStep ? 560 : 420;
 
