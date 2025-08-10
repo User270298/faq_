@@ -124,6 +124,35 @@ export const getFAQStats = async (): Promise<Record<string, unknown>> => {
   return response.data;
 };
 
+// Типы для ИИ поиска
+export interface AISearchResult {
+  id: number;
+  question: string;
+  answer: string;
+  keywords: string[];
+  category: string;
+  priority?: number;
+  relevance_score: number;
+  match_type: string;
+}
+
+export interface AISearchResponse {
+  success: boolean;
+  query: string;
+  results_count: number;
+  matches: AISearchResult[];
+  suggestions: string[];
+  message?: string;
+}
+
+// ИИ поиск FAQ с улучшенной релевантностью
+export const aiSearchFAQ = async (query: string): Promise<AISearchResponse> => {
+  const response = await api.get('/api/faq/ai-search', {
+    params: { q: query }
+  });
+  return response.data;
+};
+
 // Tariffs API функции
 export const getTariffs = async (): Promise<TariffsResponse> => {
   const response = await api.get('/api/tariffs/');

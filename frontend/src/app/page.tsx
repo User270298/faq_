@@ -3,8 +3,11 @@
 import { useState, useEffect, useRef } from 'react';
 import Image from 'next/image';
 import { Send, Bot, User, FileText, Sparkles, MessageCircle, X, Mail, Phone } from 'lucide-react';
-import { searchFAQ } from '@/lib/api';
+import { searchFAQ, aiSearchFAQ, AISearchResponse } from '@/lib/api';
 import ReactMarkdown from 'react-markdown';
+import { TariffsService } from '@/services/tariffsService';
+import type { Tariff as TariffItem } from '@/types/api';
+import { FAQService } from '@/services/faqService';
 
 interface Message {
   id: string;
@@ -21,7 +24,6 @@ export default function Home() {
   const [showApplicationSuggestion, setShowApplicationSuggestion] = useState(false);
   const [hasShownApplicationSuggestion, setHasShownApplicationSuggestion] = useState(false); // Флаг для показа только один раз
   const [isFullChatOpen, setIsFullChatOpen] = useState(false);
-  // const [questionCount, setQuestionCount] = useState(0); // Убираем неиспользуемую переменную
   const [showApplicationModal, setShowApplicationModal] = useState(false);
   const [applicationForm, setApplicationForm] = useState({ 
     name: '', 
@@ -32,8 +34,53 @@ export default function Home() {
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
+  // Состояния диалога (пошаговая логика)
+  const [currentStep, setCurrentStep] = useState<'welcome' | 'faq' | 'tariff_list' | 'tariff_selected'>('welcome');
+  const [stepHistory, setStepHistory] = useState<Array<'welcome' | 'faq' | 'tariff_list' | 'tariff_selected'>>([]);
+  const [tariffs, setTariffs] = useState<TariffItem[]>([]);
+  const [selectedTariffId, setSelectedTariffId] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // Простая NLP-нормализация и расширение запроса с синонимами
+  const RUSSIAN_STOPWORDS = new Set([
+    'и','в','во','не','что','он','на','я','с','со','как','а','то','все','она','так','его','но','да','ты','к','у','же','вы','за','бы','по','только','ее','мне','было','вот','от','меня','еще','нет','о','из','ему','теперь','когда','даже','ну','вдруг','ли','если','уже','или','ни','быть','был','него','до','вас','нибудь','опять','уж','вам','ведь','там','потом','себя','ничего','ей','может','они','тут','где','есть','надо','ней','для','мы','тебя','их','чем','была','сам','чтоб','без','будто','чего','раз','тоже','себе','под','будет','ж','тогда','кто','этот','того','потому','этого','какой','совсем','ним','здесь','этом','один','почти','мой','тем','чтобы','нее','сейчас','были','куда','зачем','всех','никогда','можно','при','наконец','два','об','другой','хоть','после','над','больше','тот','через','эти','нас','про','всего','них','какая','много','разве','три','эту','моя','впрочем','хорошо','свою','этой','перед','иногда','лучше','чуть','том','нельзя','такой','им','более','всегда','конечно','всю','между'
+  ]);
+
+  const SYNONYMS: Record<string, string[]> = {
+    'тариф': ['план','стоимость','цена','подписка','пакет'],
+    'поддержка': ['саппорт','помощь','техподдержка'],
+    'оплата': ['платеж','стоимость','цена','способ оплаты','оплатить'],
+    'установка': ['настройка','интеграция','внедрение'],
+    'бесплатный': ['free','пробный','trial','триал'],
+  };
+
+  const normalizeText = (text: string): string => {
+    return text
+      .toLowerCase()
+      .replace(/ё/g, 'е')
+      .replace(/[^a-zа-я0-9\s]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+  };
+
+  const expandWithSynonyms = (text: string): string => {
+    const tokens = normalizeText(text).split(' ').filter(Boolean);
+    const expanded: string[] = [];
+    for (const token of tokens) {
+      if (RUSSIAN_STOPWORDS.has(token)) continue;
+      expanded.push(token);
+      if (SYNONYMS[token]) {
+        expanded.push(...SYNONYMS[token]);
+      }
+    }
+    return Array.from(new Set(expanded)).join(' ');
+  };
+
+  const faqServiceRef = useRef<FAQService | null>(null);
+  if (faqServiceRef.current === null) {
+    faqServiceRef.current = new FAQService();
+  }
 
   // Популярные вопросы из FAQ (5 вопросов)
   const popularQuestions = [
@@ -53,16 +100,22 @@ export default function Home() {
   }, [messages]);
 
   useEffect(() => {
-    // Приветственное сообщение
+    // Приветственное сообщение с выбором режима
     const welcomeMessage: Message = {
       id: 'welcome',
       type: 'bot',
-      content: 'Привет! Я ваш умный помощник. Задайте любой вопрос или выберите из популярных тем ниже. Я постараюсь найти для вас самый подходящий ответ! ✨',
+      content: '**Добро пожаловать!**\n\nВыберите режим: **FAQ** или **Подбор тарифа**. Также вы можете просто задать вопрос внизу или выбрать из популярных тем.',
       timestamp: new Date()
     };
     setMessages([welcomeMessage]);
     // Показываем часто задаваемые вопросы сразу при открытии
     setShowPopularQuestions(true);
+    setCurrentStep('welcome');
+
+    // Загружаем тарифы из локального источника
+    const service = new TariffsService();
+    const data = service.getAllTariffs();
+    setTariffs(data.tariffs);
   }, []);
 
   // Показываем часто задаваемые вопросы снова после ответа
@@ -130,24 +183,56 @@ export default function Home() {
     setShowPopularQuestions(false);
 
     try {
-      const response = await searchFAQ(inputValue);
-      
-      if (response.success && response.data?.faq && response.data.faq.length > 0) {
-        const botMessage: Message = {
-          id: (Date.now() + 1).toString(),
-          type: 'bot',
-          content: response.data.faq[0].answer,
-          timestamp: new Date()
-        };
+      // 1) ИИ-поиск
+      const aiResponse: AISearchResponse = await aiSearchFAQ(inputValue);
+      if (aiResponse.success && aiResponse.matches && aiResponse.matches.length > 0) {
+        const best = aiResponse.matches[0];
+        let botContent = `**Ближайший вопрос:** ${best.question}\n\n${best.answer}`;
+        if (aiResponse.matches.length > 1) {
+          botContent += `\n\n🔍 **Похожие вопросы:**`;
+          for (let i = 1; i < Math.min(3, aiResponse.matches.length); i++) {
+            const m = aiResponse.matches[i];
+            botContent += `\n• ${m.question} (${m.relevance_score}%)`;
+          }
+        }
+        const botMessage: Message = { id: (Date.now() + 1).toString(), type: 'bot', content: botContent, timestamp: new Date() };
         setMessages(prev => [...prev, botMessage]);
       } else {
-        const botMessage: Message = {
-          id: (Date.now() + 1).toString(),
-          type: 'bot',
-          content: 'Извините, я не нашел подходящего ответа на ваш вопрос. Попробуйте переформулировать или выберите один из популярных вопросов ниже.',
-          timestamp: new Date()
-        };
-        setMessages(prev => [...prev, botMessage]);
+        // 2) Поиск по ключевым словам на бэкенде
+        const fallback = await searchFAQ(inputValue);
+        if (fallback.success && fallback.data?.faq && fallback.data.faq.length > 0) {
+          const top = fallback.data.faq[0];
+          const botMessage: Message = {
+            id: (Date.now() + 1).toString(),
+            type: 'bot',
+            content: `**Ближайший вопрос:** ${top.question}\n\n${top.answer}`,
+            timestamp: new Date()
+          };
+          setMessages(prev => [...prev, botMessage]);
+        } else {
+          // 3) Локальный поиск с NLP-расширением
+          const expanded = expandWithSynonyms(inputValue);
+          const local = faqServiceRef.current?.searchFAQ(expanded) || [];
+          if (local.length > 0) {
+            const top = local[0];
+            const botMessage: Message = {
+              id: (Date.now() + 1).toString(),
+              type: 'bot',
+              content: `**Ближайший вопрос:** ${top.question}\n\n${top.answer}`,
+              timestamp: new Date()
+            };
+            setMessages(prev => [...prev, botMessage]);
+          } else {
+            let noResultsContent = aiResponse.message || 'Извините, я не нашел подходящего ответа на ваш вопрос.';
+            const popular = faqServiceRef.current?.getPopularQuestions(3) || [];
+            if (popular.length > 0) {
+              noResultsContent += '\n\n🔥 **Популярные вопросы:**';
+              popular.forEach(p => { noResultsContent += `\n• ${p.question}`; });
+            }
+            const botMessage: Message = { id: (Date.now() + 1).toString(), type: 'bot', content: noResultsContent, timestamp: new Date() };
+            setMessages(prev => [...prev, botMessage]);
+          }
+        }
       }
     } catch (error: unknown) {
       console.error('Ошибка при поиске FAQ:', error);
@@ -186,24 +271,49 @@ export default function Home() {
     setIsLoading(true);
 
     try {
-      const response = await searchFAQ(question);
-      
-      if (response.success && response.data?.faq && response.data.faq.length > 0) {
+      const aiResponse: AISearchResponse = await aiSearchFAQ(question);
+      if (aiResponse.success && aiResponse.matches && aiResponse.matches.length > 0) {
+        const best = aiResponse.matches[0];
         const botMessage: Message = {
           id: (Date.now() + 1).toString(),
           type: 'bot',
-          content: response.data.faq[0].answer,
+          content: `**Ближайший вопрос:** ${best.question}\n\n${best.answer}`,
           timestamp: new Date()
         };
         setMessages(prev => [...prev, botMessage]);
       } else {
-        const botMessage: Message = {
-          id: (Date.now() + 1).toString(),
-          type: 'bot',
-          content: 'Извините, я не нашел подходящего ответа на этот вопрос.',
-          timestamp: new Date()
-        };
-        setMessages(prev => [...prev, botMessage]);
+        const fallbackResponse = await searchFAQ(question);
+        if (fallbackResponse.success && fallbackResponse.data?.faq && fallbackResponse.data.faq.length > 0) {
+          const top = fallbackResponse.data.faq[0];
+          const botMessage: Message = {
+            id: (Date.now() + 1).toString(),
+            type: 'bot',
+            content: `**Ближайший вопрос:** ${top.question}\n\n${top.answer}`,
+            timestamp: new Date()
+          };
+          setMessages(prev => [...prev, botMessage]);
+        } else {
+          const expanded = expandWithSynonyms(question);
+          const local = faqServiceRef.current?.searchFAQ(expanded) || [];
+          if (local.length > 0) {
+            const top = local[0];
+            const botMessage: Message = {
+              id: (Date.now() + 1).toString(),
+              type: 'bot',
+              content: `**Ближайший вопрос:** ${top.question}\n\n${top.answer}`,
+              timestamp: new Date()
+            };
+            setMessages(prev => [...prev, botMessage]);
+          } else {
+            const botMessage: Message = {
+              id: (Date.now() + 1).toString(),
+              type: 'bot',
+              content: 'Извините, я не нашел подходящего ответа на этот вопрос.',
+              timestamp: new Date()
+            };
+            setMessages(prev => [...prev, botMessage]);
+          }
+        }
       }
     } catch (error: unknown) {
       console.error('Ошибка при поиске FAQ (quick question):', error);
@@ -227,6 +337,45 @@ export default function Home() {
       setShowApplicationModal(true);
     }, 100); // Небольшая задержка для гарантии обновления состояния
     console.log('🔴 Скрываем предложение заявки');
+  };
+
+  // Навигация по шагам
+  const goToStep = (next: 'welcome' | 'faq' | 'tariff_list' | 'tariff_selected') => {
+    setStepHistory((prev) => [...prev, currentStep]);
+    setCurrentStep(next);
+  };
+
+  const goBack = () => {
+    setStepHistory((prev) => {
+      if (prev.length === 0) {
+        setCurrentStep('welcome');
+        return prev;
+      }
+      const copy = [...prev];
+      const last = copy.pop() as 'welcome' | 'faq' | 'tariff_list' | 'tariff_selected';
+      setCurrentStep(last);
+      return copy;
+    });
+  };
+
+  const openTariffSelection = () => {
+    goToStep('tariff_list');
+    setShowPopularQuestions(false);
+  };
+
+  const selectTariff = (tariffId: string) => {
+    setSelectedTariffId(tariffId);
+    setApplicationForm((prev) => ({ ...prev, selectedTariff: tariffId }));
+    goToStep('tariff_selected');
+  };
+
+  const openApplicationWithTariff = (tariffId?: string) => {
+    if (tariffId) {
+      setApplicationForm((prev) => ({ ...prev, selectedTariff: tariffId }));
+      setSelectedTariffId(tariffId);
+    }
+    setShowApplicationSuggestion(false);
+    setShowApplicationModal(true);
   };
 
   const handleApplicationSubmit = async (e: React.FormEvent) => {
@@ -288,6 +437,13 @@ export default function Home() {
       setIsFullChatOpen(true);
     }
   };
+
+  // Настраиваем размеры контейнера и панели по шагам
+  const isWelcomeStep = currentStep === 'welcome';
+  const isFaqStep = currentStep === 'faq';
+  const isTariffStep = currentStep === 'tariff_list' || currentStep === 'tariff_selected';
+  const containerMaxWidthClass = isWelcomeStep ? 'max-w-xl' : isFaqStep ? 'max-w-4xl' : 'max-w-3xl';
+  const panelHeightPx = isWelcomeStep ? 280 : isFaqStep ? 560 : 420;
 
   // Если полный чат не открыт, показываем только форму ввода
   if (!isFullChatOpen) {
@@ -446,9 +602,12 @@ export default function Home() {
           </div>
         </div>
 
-        {/* Full chat interface with messages */}
-        <div className="w-full max-w-4xl mx-auto">
-          <div className="bg-gray-900/95 backdrop-blur-xl rounded-2xl shadow-2xl border border-white/10 h-[500px] flex flex-col overflow-hidden">
+        {/* Full chat interface with adaptive size */}
+        <div className={`w-full ${containerMaxWidthClass} mx-auto transition-all duration-500 ease-in-out`}>
+          <div
+            className="bg-gray-900/95 backdrop-blur-xl rounded-2xl shadow-2xl border border-white/10 flex flex-col overflow-hidden transition-all duration-500 ease-in-out"
+            style={{ height: `${panelHeightPx}px` }}
+          >
             {/* Header */}
             <div className="bg-gradient-to-r from-blue-500 to-purple-600 text-white p-4 rounded-t-2xl flex justify-between items-center">
               <h3 className="font-semibold text-lg">FAQ Помощник</h3>
@@ -460,7 +619,120 @@ export default function Home() {
               </button>
             </div>
 
-            {/* Messages area */}
+            {/* Шаги диалога (выбор режима/тарифов) */}
+            <div className="p-4 border-b border-white/10">
+              {currentStep === 'welcome' && (
+                <div className="bg-white/5 border border-white/10 rounded-xl p-4 flex flex-col gap-4 items-stretch">
+                  <div className="text-white/90 text-sm text-center">Выберите режим диалога:</div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <button
+                      onClick={() => {
+                        goToStep('faq');
+                        setIsFullChatOpen(true);
+                        setShowPopularQuestions(true);
+                      }}
+                      className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white px-4 py-3 rounded-xl text-sm font-semibold transition-all duration-300 transform hover:scale-[1.02]"
+                    >
+                      FAQ
+                    </button>
+                    <button
+                      onClick={() => {
+                        setIsFullChatOpen(true);
+                        openTariffSelection();
+                      }}
+                      className="bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white px-4 py-3 rounded-xl text-sm font-semibold transition-all duration-300 transform hover:scale-[1.02]"
+                    >
+                      Подбор тарифа
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {currentStep === 'tariff_list' && (
+                <div className="space-y-3 animate-[fade-in_0.25s_ease-out_forwards]">
+                  <div className="flex items-center justify-between">
+                    <p className="text-white/90 font-medium">Краткое описание тарифов</p>
+                    <button onClick={goBack} className="text-white/70 hover:text-white text-sm">← Назад</button>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    {tariffs.map((t) => (
+                      <div key={t.id} className="bg-white/5 border border-white/10 rounded-xl p-4 text-white/90 transition-transform duration-300 hover:scale-[1.01]">
+                        <div className="flex items-baseline justify-between mb-2">
+                          <h4 className="text-base font-semibold">{t.name}</h4>
+                          <span className="text-sm text-white/80">{t.price.toLocaleString('ru-RU')} ₽/мес</span>
+                        </div>
+                        <p className="text-white/70 text-sm mb-3">{t.description}</p>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => selectTariff(t.id)}
+                            className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white px-3 py-2 rounded-lg text-xs font-semibold transition-all duration-300"
+                          >
+                            Выбрать
+                          </button>
+                          <button
+                            onClick={() => openApplicationWithTariff(t.id)}
+                            className="bg-white/10 hover:bg-white/20 text-white px-3 py-2 rounded-lg text-xs font-medium border border-white/20 transition-all duration-300"
+                          >
+                            Оставить заявку
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {currentStep === 'faq' && (
+                <div className="flex items-center justify-between">
+                  <p className="text-white/90 font-medium">Режим: FAQ</p>
+                  <button onClick={goBack} className="text-white/70 hover:text-white text-sm">← Назад</button>
+                </div>
+              )}
+
+              {currentStep === 'tariff_selected' && selectedTariffId && (
+                <div className="bg-white/5 border border-white/10 rounded-xl p-4 text-white/90 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <p className="font-semibold">Вы выбрали тариф</p>
+                    <button onClick={goBack} className="text-white/70 hover:text-white text-sm">← Назад</button>
+                  </div>
+                  {(() => {
+                    const t = tariffs.find((x) => x.id === selectedTariffId);
+                    if (!t) return null;
+                    return (
+                      <div>
+                        <div className="flex items-baseline justify-between mb-1">
+                          <h4 className="text-base font-semibold">{t.name}</h4>
+                          <span className="text-sm text-white/80">{t.price.toLocaleString('ru-RU')} ₽/мес</span>
+                        </div>
+                        <p className="text-white/80 text-sm mb-3">{t.description}</p>
+                        <ul className="list-disc list-inside text-white/80 text-sm space-y-1 mb-4">
+                          {t.features.slice(0, 3).map((f, i) => (
+                            <li key={i}>{f}</li>
+                          ))}
+                        </ul>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => openApplicationWithTariff(t.id)}
+                            className="bg-gradient-to-r from-green-500 to-blue-600 hover:from-green-600 hover:to-blue-700 text-white px-4 py-2 rounded-lg text-sm font-semibold transition-all duration-300"
+                          >
+                            Оставить заявку
+                          </button>
+                          <button
+                            onClick={() => setCurrentStep('tariff_list')}
+                            className="bg-white/10 hover:bg-white/20 text-white px-4 py-2 rounded-lg text-sm font-medium border border-white/20 transition-all duration-300"
+                          >
+                            Выбрать другой
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })()}
+                </div>
+              )}
+            </div>
+
+            {/* Messages area: показываем только в режиме FAQ */}
+            {currentStep === 'faq' && (
             <div className="flex-1 overflow-y-auto p-4 space-y-4">
               {messages.map((message) => (
                 <div
@@ -527,9 +799,10 @@ export default function Home() {
               
               <div ref={messagesEndRef} />
             </div>
+            )}
 
-            {/* Popular questions - компактные внизу */}
-            {showPopularQuestions && (
+            {/* Popular questions - компактные внизу (только в режиме FAQ) */}
+            {currentStep === 'faq' && showPopularQuestions && (
               <div className="p-3 border-t border-white/10">
                 <div className="flex items-center gap-2 mb-2">
                   <Sparkles size={14} className="text-yellow-400 animate-pulse" />
@@ -553,8 +826,8 @@ export default function Home() {
               </div>
             )}
 
-            {/* Application suggestion - через 3 сообщения или 20 секунд */}
-            {showApplicationSuggestion && !showApplicationModal && (
+            {/* Application suggestion - только в режиме FAQ */}
+            {currentStep === 'faq' && showApplicationSuggestion && !showApplicationModal && (
               <div className="p-4 border-t border-white/10">
                 <div className="bg-gradient-to-r from-green-500/20 to-blue-500/20 rounded-xl p-4 border border-green-400/30 relative">
                   {/* Кнопка свернуть */}
@@ -583,7 +856,8 @@ export default function Home() {
               </div>
             )}
 
-            {/* Input area */}
+            {/* Input area: только в режиме FAQ */}
+            {currentStep === 'faq' && (
             <div className="p-4 border-t border-white/10">
               <div className="flex items-center gap-4">
                 {/* User icon */}
@@ -615,6 +889,7 @@ export default function Home() {
                 </button>
               </div>
             </div>
+            )}
           </div>
         </div>
       </div>

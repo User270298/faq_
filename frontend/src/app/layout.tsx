@@ -15,8 +15,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "FAQ System",
-  description: "Interactive FAQ system with AI chat",
+  title: "Valles Bot - FAQ & Tariffs",
+  description: "Valles Bot",
   viewport: "width=device-width, initial-scale=1",
   themeColor: "#0f0f23",
   manifest: "/manifest.json",
