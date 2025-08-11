@@ -26,11 +26,11 @@ class Settings(BaseSettings):
     # Email settings
     admin_email: str = "parkwoodoleg@yandex.ru"  # Email администратора для уведомлений
     smtp_host: str = "smtp.yandex.ru"
-    smtp_port: int = 465 
+    smtp_port: int = 587 
     smtp_user: str = "parkwoodoleg@yandex.ru"
-    smtp_password: str = "parkwood2702"
+    smtp_password: str = "dmxxyki" #dmxxykilglgkzlcz
     smtp_from: str = "parkwoodoleg@yandex.ru"  # Если пусто, использовать smtp_user
-    smtp_use_tls: bool = False  # STARTTLS (порт 587); для SSL (465) установите False и используйте SMTP_SSL
+    smtp_use_tls: bool = True  # STARTTLS (порт 587); для SSL (465) установите False и используйте SMTP_SSL
 
     # Telegram settings
     telegram_bot_token: str = "8014660296:AAGIcduqoTLp_y7_hRvlNJKxlIfV_QoDt-s"

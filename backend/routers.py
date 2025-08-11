@@ -86,6 +86,21 @@ async def ai_search(q: str = Query(..., description="Search query for AI search"
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@faq_router.get("/best", response_model=FAQItem)
+async def get_best_answer(q: str = Query(..., description="Пользовательский запрос для подбора лучшего ответа")):
+    """Возвращает один наиболее релевантный FAQItem по количеству совпадений ключевых слов и текста вопроса."""
+    try:
+        if not q.strip():
+            raise HTTPException(status_code=400, detail="Query cannot be empty")
+        best = faq_service.find_best_answer(q)
+        if not best:
+            raise HTTPException(status_code=404, detail="No relevant answer found")
+        return best
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 @faq_router.get("/{faq_id}", response_model=FAQItem)
 async def get_faq_by_id(faq_id: int):
     """Get FAQ item by ID"""

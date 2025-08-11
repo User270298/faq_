@@ -1,4 +1,6 @@
 from fastapi import FastAPI
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from routers import faq_router, tariffs_router, applications_router
 from config import settings
@@ -19,6 +21,28 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Единый обработчик ошибок валидации: превращает ошибки Pydantic в строковый detail
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request, exc: RequestValidationError):
+    try:
+        errors = exc.errors() if hasattr(exc, 'errors') else []
+        messages = []
+        for err in errors:
+            loc = err.get('loc', [])
+            msg = err.get('msg', 'Invalid input')
+            # Убираем технические части местоположения (body/query/path)
+            filtered = [str(x) for x in loc if x not in ('body', 'query', 'path')]
+            field_path = ".".join(filtered)
+            if field_path:
+                messages.append(f"{field_path}: {msg}")
+            else:
+                messages.append(msg)
+        text = "; ".join(messages) if messages else "Validation error"
+        return JSONResponse(status_code=422, content={"detail": text, "errors": errors})
+    except Exception:
+        # Фоллбэк на случай непредвиденного формата ошибок
+        return JSONResponse(status_code=422, content={"detail": "Validation error"})
 
 # Include routers
 app.include_router(faq_router, prefix="/api/faq", tags=["FAQ"])

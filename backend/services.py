@@ -209,6 +209,81 @@ class FAQService:
             "matches": matches,
             "suggestions": suggestions,
         }
+
+    def find_best_answer(self, query: str) -> Optional[FAQItem]:
+        """Возвращает один наиболее релевантный FAQItem.
+
+        Логика ранжирования:
+        - Считаем количество совпавших токенов запроса с keywords каждого элемента (высокий вес)
+        - Учитываем вхождения токенов запроса в вопрос (умеренный вес)
+        - Небольшой вес за вхождения в ответ
+        - При равенстве — выше тот, у кого больше keyword-совпадений, затем вопрос-совпадений
+        """
+        try:
+            data = self._load_data()
+            q = (query or "").strip().lower()
+            if not q:
+                return None
+
+            import re as _re
+            def tokenize(text: str) -> List[str]:
+                t = (text or "").lower().replace('ё', 'е')
+                return [tok for tok in _re.split(r"[^a-zа-я0-9]+", t) if tok]
+
+            qtokens = set(tokenize(q))
+            if not qtokens:
+                return None
+
+            best: Optional[tuple[FAQItem, int, int, int, float]] = None  # (item, kw_cnt, q_cnt, a_cnt, score)
+
+            for item in data.faq:
+                keywords_text = " ".join((item.keywords or []))
+                question_text = item.question or ""
+                answer_text = item.answer or ""
+
+                # Подсчитываем количества совпадений по токенам
+                kw_cnt = 0
+                kw_text_norm = keywords_text.lower()
+                for tok in qtokens:
+                    if tok and tok in kw_text_norm:
+                        kw_cnt += 1
+
+                q_cnt = 0
+                q_text_norm = question_text.lower()
+                for tok in qtokens:
+                    if tok and tok in q_text_norm:
+                        q_cnt += 1
+
+                a_cnt = 0
+                a_text_norm = answer_text.lower()
+                for tok in qtokens:
+                    if tok and tok in a_text_norm:
+                        a_cnt += 1
+
+                # Веса: keywords — высокий приоритет
+                score = kw_cnt * 100 + q_cnt * 30 + a_cnt * 5
+
+                current = (item, kw_cnt, q_cnt, a_cnt, float(score))
+                if best is None:
+                    best = current
+                else:
+                    # Сравнение по score, затем по количеству совпадений в keywords и вопросе
+                    _, b_kw, b_qc, b_ac, b_score = best
+                    if score > b_score:
+                        best = current
+                    elif score == b_score:
+                        if kw_cnt > b_kw:
+                            best = current
+                        elif kw_cnt == b_kw:
+                            if q_cnt > b_qc:
+                                best = current
+                            elif q_cnt == b_qc and a_cnt > b_ac:
+                                best = current
+
+            return best[0] if best else None
+        except Exception as e:
+            logger.error(f"Error in find_best_answer: {e}")
+            return None
     
     def get_faq_by_id(self, faq_id: int) -> Optional[FAQItem]:
         """Get FAQ item by ID"""

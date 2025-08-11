@@ -50,7 +50,12 @@ export default function ApplicationForm({ onClose, onBack, onActivity, onSuccess
       onClose();
     } catch (error) {
       console.error('Ошибка при отправке заявки:', error);
-      setError('Ошибка при отправке заявки. Попробуйте еще раз.');
+      // Показываем понятное сообщение пользователю
+      if (error instanceof Error && error.message) {
+        setError(error.message);
+      } else {
+        setError('Ошибка при отправке заявки. Попробуйте еще раз.');
+      }
       setIsSubmitting(false);
     }
   };
@@ -109,7 +114,6 @@ export default function ApplicationForm({ onClose, onBack, onActivity, onSuccess
                 value={formData.name}
                 onChange={handleChange}
                 onFocus={() => onActivity?.()}
-                required
                 className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-300 text-gray-900 placeholder-gray-500 bg-white !bg-white"
                 style={{ 
                   backgroundColor: 'white',
@@ -135,7 +139,6 @@ export default function ApplicationForm({ onClose, onBack, onActivity, onSuccess
                 value={formData.email}
                 onChange={handleChange}
                 onFocus={() => onActivity?.()}
-                required
                 className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-300 text-gray-900 placeholder-gray-500 bg-white !bg-white"
                 style={{ 
                   backgroundColor: 'white',

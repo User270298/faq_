@@ -13,6 +13,11 @@ export async function submitApplication(applicationData: ApplicationCreate): Pro
     return response.data;
   } catch (error) {
     console.error('Ошибка при отправке заявки на бэкенд:', error);
+    // Пробрасываем текст ошибки от axios интерсептора (detail/message от бэкенда)
+    if (error instanceof Error && error.message) {
+      throw new Error(error.message);
+    }
+    // Фоллбэк
     throw new Error('Не удалось отправить заявку. Попробуйте еще раз.');
   }
 }
