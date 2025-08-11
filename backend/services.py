@@ -60,67 +60,99 @@ class FAQService:
         return [item for item in data.faq if item.category == category]
     
     def search_faq(self, query: str) -> List[FAQItem]:
-        """Search FAQ by keywords or question text"""
+        """Поиск по FAQ с фильтрацией служебных слов (союзы/местоимения/предлоги).
+
+        Логика:
+        - Нормализуем текст (lower, ё→е)
+        - Токенизируем по неалфанумерическим символам
+        - Фильтруем стоп-слова и слишком короткие токены
+        - Если после фильтрации не осталось значимых токенов — возвращаем пустой список
+        - Считаем баллы по совпадениям в вопросе, ключевых словах и ответе
+        """
         try:
             data = self._load_data()
-            query_lower = query.lower().strip()
-            
-            # Разбиваем запрос на слова (включая короткие)
-            query_words = query_lower.split()
-            
+            query_lower = (query or "").lower().strip()
 
-            
-            results = []
+            import re as _re
+
+            # Набор часто встречающихся русских и английских стоп-слов
+            STOPWORDS = {
+                # Русские (союзы, предлоги, частицы, местоимения)
+                "и","а","но","или","либо","да","же","ли","то","ни","бы","б","же","уж",
+                "в","во","на","за","по","к","ко","с","со","о","об","от","до","из","изо","при","для","про","над","под","у","без","через","между","перед","около",
+                "я","мы","ты","вы","он","она","оно","они","меня","мне","мной","нас","нам","нами","тебя","тебе","тобой","вас","вам","вами","его","ему","им","ею","ее","её","их","ими",
+                "мой","моя","мое","моё","мои","твой","твоя","твое","твоё","твои","наш","наша","наше","наши","ваш","ваша","ваше","ваши",
+                "этот","эта","это","эти","тот","та","то","те","кто","что","какой","какая","какое","какие","как","где","когда","зачем","почему",
+                # Английские
+                "and","or","but","the","a","an","in","on","at","for","to","from","by","of","with","about","as","is","are","was","were","be","been","am",
+                "i","you","he","she","it","we","they","me","him","her","us","them","my","your","his","their","our","this","that","these","those","what","which","who","whom","how","where","why","when"
+            }
+
+            def _normalize(text: str) -> str:
+                return (text or "").lower().replace("ё", "е")
+
+            def _tokenize(text: str) -> List[str]:
+                t = _normalize(text)
+                return [tok for tok in _re.split(r"[^a-zа-я0-9]+", t) if tok]
+
+            def _is_meaningful(tok: str) -> bool:
+                # Значимым считаем токен, если он не стоп-слово и имеет длину >= 2 (в т.ч. VPN, 5g)
+                if not tok:
+                    return False
+                if tok in STOPWORDS:
+                    return False
+                return len(tok) >= 2
+
+            # Извлекаем значимые токены запроса
+            query_tokens = [t for t in _tokenize(query_lower) if _is_meaningful(t)]
+
+            # Если нет значимых слов, не пытаемся искать (даже если строка длинная)
+            if not query_tokens:
+                return []
+
+            results: List[tuple[FAQItem, int]] = []
             for item in data.faq:
                 score = 0
-                
-                # Поиск в вопросе (высший приоритет)
+
+                # Точные вхождения всей фразы в вопрос/ключевые слова/ответ (без фильтра)
                 question_lower = item.question.lower()
-                if query_lower in question_lower:
-                    score += 1000  # Точное совпадение
-                
-                # Поиск отдельных слов в вопросе
-                for word in query_words:
+                if query_lower and query_lower in question_lower:
+                    score += 1000
+
+                # Совпадения отдельных значимых слов в вопросе
+                for word in query_tokens:
                     if word in question_lower:
                         score += 100
-                
+
                 # Поиск в ключевых словах (средний приоритет)
                 if item.keywords and isinstance(item.keywords, list):
                     for keyword in item.keywords:
                         keyword_lower = keyword.lower()
-                        if query_lower in keyword_lower:
-                            score += 500  # Точное совпадение с ключевым словом
-                        
-                        # Поиск отдельных слов в ключевых словах
-                        for word in query_words:
+                        if query_lower and query_lower in keyword_lower:
+                            score += 500
+                        for word in query_tokens:
                             if word in keyword_lower:
                                 score += 50
-                
+
                 # Поиск в ответе (низший приоритет)
                 answer_lower = item.answer.lower()
-                if query_lower in answer_lower:
+                if query_lower and query_lower in answer_lower:
                     score += 10
-                
-                # Поиск отдельных слов в ответе
-                for word in query_words:
+                for word in query_tokens:
                     if word in answer_lower:
                         score += 1
-                
+
                 # Бонус за приоритет вопроса
                 if item.priority:
-                    score += (21 - item.priority) * 5  # Более высокий приоритет = больше баллов
-                
+                    score += (21 - item.priority) * 5
+
                 if score > 0:
                     results.append((item, score))
-            
-            # Сортируем по релевантности
+
             results.sort(key=lambda x: x[1], reverse=True)
-            
-            # Возвращаем только FAQ элементы (без score)
-            return [item for item, score in results]
+            return [item for item, _ in results]
         except Exception as e:
             logger.error(f"Error in search_faq: {e}")
-            # Return empty list instead of raising exception
             return []
 
     def ai_search(self, query: str) -> dict:

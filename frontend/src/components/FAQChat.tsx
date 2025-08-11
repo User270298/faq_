@@ -122,14 +122,21 @@ export default function FAQChat({ onActivity }: FAQChatProps) {
       if (isGreeting(inputValue.trim())) {
         botContent = getGreetingResponse();
       } else {
-        // Если не приветствие, ищем в FAQ
-        const response = await searchFAQ(inputValue.trim());
-        
-        if (response.data && response.data.faq && response.data.faq.length > 0) {
-          const bestMatch = response.data.faq[0];
-          botContent = `**${bestMatch.question}**\n\n${bestMatch.answer}`;
+        // Перед отправкой — фильтруем стоп-слова. Если остались только служебные слова — отвечаем заготовкой
+        const prepared = inputValue.trim();
+        const hasMeaningful = hasMeaningfulTokens(prepared);
+        if (!hasMeaningful) {
+          botContent = getNoKeywordsFallback();
         } else {
-          botContent = 'К сожалению, я не нашел точного ответа на ваш вопрос. Попробуйте переформулировать или выберите тему из списка ниже. Возможно, ваш вопрос касается одной из популярных тем?';
+          // Если не приветствие, ищем в FAQ
+          const response = await searchFAQ(prepared);
+          
+          if (response.data && response.data.faq && response.data.faq.length > 0) {
+            const bestMatch = response.data.faq[0];
+            botContent = `**${bestMatch.question}**\n\n${bestMatch.answer}`;
+          } else {
+            botContent = getNoKeywordsFallback();
+          }
         }
       }
 
@@ -192,6 +199,32 @@ export default function FAQChat({ onActivity }: FAQChatProps) {
   // Функция для получения ответа на приветствие
   const getGreetingResponse = (): string => {
     return 'Здравствуйте! Это бот-помощник. Чем я могу вам помочь? Задайте любой вопрос или выберите из популярных тем ниже.';
+  };
+
+  // Подготовленный ответ, если в запросе только служебные слова или ничего значимого не найдено
+  const getNoKeywordsFallback = (): string => {
+    return 'Похоже, в сообщении нет ключевых слов. Пожалуйста, уточните вопрос, добавив конкретные термины (например: "тарифы", "оплата", "поддержка"). Или выберите тему из списка ниже.';
+  };
+
+  // Проверка, содержит ли текст значимые токены (без союзов, предлогов, местоимений)
+  const hasMeaningfulTokens = (text: string): boolean => {
+    const STOPWORDS = new Set([
+      // RU
+      'и','а','но','или','либо','да','же','ли','то','ни','бы','б','уж',
+      'в','во','на','за','по','к','ко','с','со','о','об','от','до','из','изо','при','для','про','над','под','у','без','через','между','перед','около',
+      'я','мы','ты','вы','он','она','оно','они','меня','мне','мной','нас','нам','нами','тебя','тебе','тобой','вас','вам','вами','его','ему','им','ею','ее','её','их','ими',
+      'мой','моя','мое','моё','мои','твой','твоя','твое','твоё','твои','наш','наша','наше','наши','ваш','ваша','ваше','ваши',
+      'этот','эта','это','эти','тот','та','то','те','кто','что','какой','какая','какое','какие','как','где','когда','зачем','почему',
+      // EN
+      'and','or','but','the','a','an','in','on','at','for','to','from','by','of','with','about','as','is','are','was','were','be','been','am',
+      'i','you','he','she','it','we','they','me','him','her','us','them','my','your','his','their','our','this','that','these','those','what','which','who','whom','how','where','why','when'
+    ]);
+
+    const normalized = text.toLowerCase().replace('ё','е').trim();
+    if (!normalized) return false;
+    const tokens = normalized.split(/[^a-zа-я0-9]+/).filter(Boolean);
+    const meaningful = tokens.filter(tok => tok.length >= 2 && !STOPWORDS.has(tok));
+    return meaningful.length > 0;
   };
 
   // Функция для определения вопроса о заявке
